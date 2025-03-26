@@ -1,8 +1,17 @@
 # Create a 2D projection of document embeddings using t-SNE for visualization
+import textwrap
+
 import matplotlib.pyplot as plt
 import numpy as np
 from IPython.display import Markdown, display
 from sklearn.manifold import TSNE
+
+
+def nicer_print(text, width=80):
+    """
+    Print text with a width of 80 characters
+    """
+    print(textwrap.fill(text, width=width))
 
 
 def create_document_embedding_visualization(documents):
