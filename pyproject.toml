@@ -11,5 +11,6 @@ dependencies = [
     "matplotlib>=3.10.1",
     "nltk>=3.9.1",
     "pypdf>=5.4.0",
+    "scikit-learn>=1.6.1",
     "sentence-transformers>=3.4.1",
 ]
