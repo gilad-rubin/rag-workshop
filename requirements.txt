@@ -555,6 +555,9 @@ pypdf==5.4.0 \
 python-dateutil==2.9.0.post0 \
     --hash=sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3 \
     --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+python-dotenv==1.1.0 \
+    --hash=sha256:41f90bc6f5f177fb41f53e87666db362025010eb28f60a01c9143bfa33a2b2d5 \
+    --hash=sha256:d7c01d9e2293916c18baf562d95698754b0dbbb5e74d457c45d4f6561fb9d55d
 pywin32==310 ; platform_python_implementation != 'PyPy' and sys_platform == 'win32' \
     --hash=sha256:8a75a5cc3893e83a108c05d82198880704c44bbaee4d06e442e471d3c9ea4f3d \
     --hash=sha256:bf5c397c9a9a19a6f62f3fb821fbf36cac08f03770056711f765ec1503972060 \
