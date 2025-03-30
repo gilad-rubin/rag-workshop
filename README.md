@@ -2,6 +2,32 @@
 
 This repository contains a Retrieval-Augmented Generation (RAG) pipeline implementation using Haystack. The pipeline demonstrates how to build a question-answering system that combines document retrieval with language model generation.
 
+# Project Setup
+
+## Environment Setup
+
+Choose one of the following methods to set up your environment:
+
+**Using UV**
+
+1.  `uv sync`
+2.  `uv run jupyter lab notebooks/rag_pipeline.ipynb`
+
+**Using Pip**
+
+1.  Install a Python 3.12 environment using venv or conda (e.g., `conda create -n environment-name python=3.12`).
+2.  Activate the environment (e.g., `conda activate environment-name`).
+3.  `pip install -r requirements.txt`
+4.  `jupyter lab notebooks/rag_pipeline.ipynb`
+
+## API Key Setup
+
+1.  Rename `.env.example` to `.env`.
+2.  Add your OpenAI API key to the `.env` file in the following format:
+    ```
+    OPENAI_API_KEY=sk-...
+    ```
+    
 ## Features
 
 - PDF document processing and text extraction
