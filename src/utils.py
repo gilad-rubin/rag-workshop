@@ -1,8 +1,8 @@
-# Create a 2D projection of document embeddings using t-SNE for visualization
 import textwrap
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from IPython.display import Markdown, display
 from sklearn.manifold import TSNE
 
@@ -67,7 +67,7 @@ def display_pipeline(pipeline):
     # Prepare mermaid syntax with graph configuration
     mermaid_code = [
         "```mermaid",
-        "%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '16px', 'fontFamily': 'arial', 'lineWidth': '2px' }}}%%",
+        "%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '16px', 'fontFamily': 'arial', 'lineWidth': '2px', 'edgeLabelBackground': '#ffffff'}}}%%",
         "graph TD;",
     ]
 
@@ -105,3 +105,129 @@ def display_pipeline(pipeline):
 
     # Display in notebook with added spacing
     display(Markdown("\n".join(mermaid_code)))
+
+
+pd.set_option("display.max_colwidth", 100)
+
+
+def visualize_document_scores(documents, metadata_field="file_path"):
+    """
+    Visualize the relevance scores of retrieved documents grouped by metadata field.
+    Each group is displayed as a bucket with individual bars for each document.
+    Groups are sorted by their document count (descending), then by maximum score.
+    Documents within each group are sorted by score.
+
+    Args:
+        documents: List of retrieved documents with score and metadata attributes
+        metadata_field: The metadata field to group by (default: "file_path")
+    """
+    # Extract scores and metadata
+    scores = [doc.score for doc in documents]
+    metadata_values = [
+        doc.meta.get(metadata_field, "Unknown") if hasattr(doc, "meta") else "Unknown"
+        for doc in documents
+    ]
+
+    # Create a DataFrame for easier manipulation
+    df = pd.DataFrame({"score": scores, metadata_field: metadata_values})
+
+    # Get just the filename from the path for cleaner display if metadata is file_path
+    if metadata_field == "file_path":
+        df["display_name"] = df[metadata_field].apply(
+            lambda x: x.split("/")[-1] if isinstance(x, str) else "Unknown"
+        )
+    else:
+        df["display_name"] = df[metadata_field]
+
+    # Calculate max score and count per group for sorting
+    group_stats = df.groupby(metadata_field).agg(
+        group_max_score=("score", "max"), group_count=("score", "count")
+    )
+
+    # Sort by count (descending), then by max score (descending)
+    group_stats = group_stats.sort_values(
+        ["group_count", "group_max_score"], ascending=[False, False]
+    )
+
+    # Map the group stats back to the dataframe
+    df["group_max_score"] = df[metadata_field].map(group_stats["group_max_score"])
+    df["group_count"] = df[metadata_field].map(group_stats["group_count"])
+
+    # Sort the dataframe: first by group count (descending), then by group's max score (descending),
+    # then by individual score within group (descending)
+    df = df.sort_values(
+        ["group_count", "group_max_score", metadata_field, "score"],
+        ascending=[False, False, True, False],
+    )
+
+    # Create a new figure
+    plt.figure(figsize=(12, 8))
+
+    # Prepare for plotting
+    groups = df[metadata_field].unique()
+    n_groups = len(groups)
+    group_positions = np.arange(n_groups)
+
+    # Map groups to positions based on the new sorting
+    group_to_position = {group: i for i, group in enumerate(groups)}
+
+    # Create a distinct color palette for bars within each group
+    color_map = plt.cm.tab10  # Using tab10 for more distinct colors
+
+    # Fixed width for all bars
+    width = 0.2
+
+    # Plot individual bars for each document
+    for idx, (_, row) in enumerate(df.iterrows()):
+        group_pos = group_to_position[row[metadata_field]]
+        # Calculate position within group based on document count
+        group_docs = df[df[metadata_field] == row[metadata_field]]
+        # Find position of current document within its group
+        doc_position = group_docs.index.get_indexer([row.name])[0]
+
+        # Calculate offset to center the bars within each group
+        total_width = width * len(group_docs)
+        start_offset = -total_width / 2
+        offset = start_offset + (doc_position * width) + (width / 2)
+
+        # Use distinct colors for each document within a group
+        color_idx = doc_position % 10  # tab10 has 10 distinct colors
+
+        # Plot the bar
+        bar = plt.bar(
+            group_pos + offset,
+            row["score"],
+            width=width,
+            color=color_map(color_idx),
+            alpha=0.8,
+            edgecolor="black",
+            linewidth=0.5,
+        )
+
+        # Add score text on top of each bar
+        plt.text(
+            group_pos + offset,
+            row["score"] + 0.01,  # Slightly above the bar
+            f"{row['score']:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            rotation=45,
+        )
+
+    # Set the x-axis labels to the group names
+    plt.xticks(group_positions, groups)
+    plt.xlabel(metadata_field)
+    plt.ylabel("Relevance Score")
+    plt.title(f"Document Relevance Scores Grouped by {metadata_field}")
+    plt.ylim(0, df["score"].max() * 1.2)  # Add more padding to accommodate score labels
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+    plt.tight_layout()
+    plt.show()
+
+    # Display detailed scores within each group
+    print(f"\nDetailed scores by {metadata_field}:")
+    return df.sort_values(
+        ["group_count", "group_max_score", metadata_field, "score"],
+        ascending=[False, False, True, False],
+    )
