@@ -14,40 +14,163 @@ def nicer_print(text, width=80):
     print(textwrap.fill(text, width=width))
 
 
-def create_document_embedding_visualization(documents):
+from matplotlib import rcParams
+
+
+def visualize_document_embeddings(
+    documents, color_by="page_number", figsize=(12, 10), text_truncate=100
+):
     """
-    Create a 2D projection of document embeddings using t-SNE and visualize them.
+    Create an interactive 2D projection of document embeddings using t-SNE with hover functionality.
 
     Args:
         documents: List of documents with embeddings
+        color_by: Metadata key to use for coloring points (default: "page_number")
+        figsize: Size of the figure as (width, height) tuple
+        text_truncate: Maximum number of characters to show in hover text
 
     Returns:
         The t-SNE projection for further use if needed
     """
-    # Extract embeddings from documents
+    # Set visualization style
+    plt.style.use("seaborn-v0_8-whitegrid")
+    rcParams["figure.figsize"] = figsize
+
+    # Extract embeddings
     embeddings = np.array([doc.embedding for doc in documents])
 
-    # Create a 2D t-SNE projection
+    # Perform dimensionality reduction
     tsne = TSNE(
-        n_components=2, random_state=42, perplexity=min(30, len(embeddings) - 1)
+        n_components=2,
+        random_state=42,
+        perplexity=min(30, len(embeddings) - 1),
+        learning_rate="auto",
+        init="pca",
     )
     projection = tsne.fit_transform(embeddings)
 
-    # Visualize the projection
-    plt.figure(figsize=(10, 8))
-    plt.scatter(projection[:, 0], projection[:, 1], alpha=0.7)
+    # Get color values from meta field
+    color_values = extract_meta_values(documents, color_by)
 
-    # Add document indices as labels
-    for i, (x, y) in enumerate(projection):
-        plt.annotate(str(i), (x, y), fontsize=9, alpha=0.8)
+    # Create figure with clean styling
+    fig, ax = plt.subplots(figsize=figsize)
 
-    plt.title("2D t-SNE Projection of Document Embeddings")
-    plt.xlabel("t-SNE Dimension 1")
-    plt.ylabel("t-SNE Dimension 2")
+    # Create a scatter plot with more vibrant colors
+    scatter = ax.scatter(
+        projection[:, 0],
+        projection[:, 1],
+        c=color_values,
+        cmap="viridis",
+        alpha=0.8,
+        s=90,
+        edgecolor="none",
+        picker=True,  # Enable picking for hover events
+    )
+
+    # Add a horizontal color bar
+    if len(set(color_values)) > 1:
+        cbar = plt.colorbar(
+            scatter, label=color_by, orientation="horizontal", pad=0.05, shrink=0.8
+        )
+        cbar.ax.tick_params(labelsize=9)
+
+    # Set title and labels with clean styling
+    ax.set_title(
+        f"2D t-SNE Projection of Document Embeddings (colored by {color_by})",
+        fontsize=13,
+        pad=10,
+    )
+    ax.set_xlabel("t-SNE Dimension 1", fontsize=11)
+    ax.set_ylabel("t-SNE Dimension 2", fontsize=11)
+
+    # Cleaner grid with lighter lines
+    ax.grid(True, linestyle="-", linewidth=0.5, alpha=0.3)
+
+    # Create annotation object (initially hidden)
+    annot = ax.annotate(
+        "",
+        xy=(0, 0),
+        xytext=(20, 20),
+        textcoords="offset points",
+        bbox=dict(boxstyle="round", fc="white", alpha=0.9),
+        arrowprops=dict(arrowstyle="->"),
+    )
+    annot.set_visible(False)
+
+    # Store document info for hover
+    point_info = []
+    for i, doc in enumerate(documents):
+        # Truncate content text
+        content = doc.content if hasattr(doc, "content") else "No content"
+        truncated_text = content[:text_truncate] + (
+            "..." if len(content) > text_truncate else ""
+        )
+
+        # Format metadata
+        meta_str = ""
+        if hasattr(doc, "meta") and doc.meta:
+            meta_str = "\n".join(
+                [
+                    f"{k}: {v}"
+                    for k, v in doc.meta.items()
+                    if k in [color_by, "page_number", "file_path", "split_id"]
+                ]
+            )
+
+        point_info.append(f"Document {i}\n{meta_str}\n\nContent:\n{truncated_text}")
+
+    def hover(event):
+        # Check if the mouse is over a point
+        if event.inaxes == ax:
+            cont, ind = scatter.contains(event)
+            if cont:
+                # Get the index of the hovered point
+                index = ind["ind"][0]
+
+                # Update annotation with document info
+                annot.xy = (projection[index, 0], projection[index, 1])
+                annot.set_text(point_info[index])
+                annot.set_visible(True)
+                fig.canvas.draw_idle()
+            else:
+                if annot.get_visible():
+                    annot.set_visible(False)
+                    fig.canvas.draw_idle()
+
+    # Connect hover event
+    fig.canvas.mpl_connect("motion_notify_event", hover)
+
     plt.tight_layout()
     plt.show()
 
     return projection
+
+
+def extract_meta_values(documents, meta_key):
+    """
+    Extract values from the meta field of documents.
+
+    Args:
+        documents: List of document objects
+        meta_key: Key in the meta dictionary to extract values from
+
+    Returns:
+        List of numeric values for coloring
+    """
+    # Extract values from meta field
+    try:
+        values = [doc.meta.get(meta_key, 0) for doc in documents]
+
+        # Handle non-numeric values if needed
+        if not all(isinstance(val, (int, float)) for val in values):
+            unique_values = sorted(set(values))
+            value_map = {val: i for i, val in enumerate(unique_values)}
+            values = [value_map[val] for val in values]
+
+        return values
+    except (AttributeError, KeyError):
+        # Fallback to default coloring if meta key doesn't exist
+        return np.zeros(len(documents))
 
 
 def display_pipeline(pipeline):
